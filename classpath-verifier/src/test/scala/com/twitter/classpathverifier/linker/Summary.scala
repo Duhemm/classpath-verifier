@@ -28,13 +28,14 @@ trait Summary {
   def summary(
       className: String,
       kind: ClassKind = ClassKind.Class,
+      access: Access = Access.Empty,
       parent: String = "java.lang.Object",
       interfaces: List[String] = Nil,
       path: Option[Path] = None,
   )(op: ClassSummaryBuilder => Unit): ClassSummary = {
     val builder = new ClassSummaryBuilder(className, parent)
     op(builder)
-    ClassSummary(kind, className, Option(parent), interfaces, builder.methods, path)
+    ClassSummary(kind, access, className, Option(parent), interfaces, builder.methods, path)
   }
 
   class ClassSummaryBuilder(className: String, parent: String) {
@@ -61,14 +62,13 @@ trait Summary {
         name,
         descriptor,
         dependencies.toList,
-        isAbstract = false,
-        isStatic = false
+        Access.PublicMethod
       )
       this
     }
 
     def abstractMeth(name: String, descriptor: String): ClassSummaryBuilder = {
-      buffer += MethodSummary(className, name, descriptor, Nil, isAbstract = true, isStatic = false)
+      buffer += MethodSummary(className, name, descriptor, Nil, Access.PublicAbstractMethod)
       this
     }
 
@@ -82,13 +82,27 @@ trait Summary {
         name,
         descriptor,
         dependencies.toList,
-        isAbstract = false,
-        isStatic = true
+        Access.PublicStaticMethod
       )
       this
     }
 
-    def emptyCtor: ClassSummaryBuilder = {
+    def privateStaticSyntheticMeth(
+        name: String,
+        descriptor: String,
+        dependencies: Dependency*
+    ): ClassSummaryBuilder = {
+      buffer += MethodSummary(
+        className,
+        name,
+        descriptor,
+        dependencies.toList,
+        Access.PrivateStaticSyntheticMethod
+      )
+      this
+    }
+
+    def emptyCtor(access: Access = Access.PublicMethod): ClassSummaryBuilder = {
       buffer += MethodSummary(
         className,
         "<init>",
@@ -97,14 +111,13 @@ trait Summary {
           ClassDependency(Reference.Clazz(parent)),
           MethodDependency.Static(Reference.Method(parent, "<init>", "()V"))
         ),
-        false,
-        false
+        access
       )
       this
     }
 
     def obj: ClassSummaryBuilder = {
-      emptyCtor
+      emptyCtor(Access.PrivateMethod)
       buffer += MethodSummary(
         className,
         "<clinit>",
@@ -114,14 +127,13 @@ trait Summary {
           ClassDependency(Reference.Clazz(s"${className}")),
           methDep("<init>")
         ),
-        false,
-        true
+        Access.Clinit
       )
       this
     }
 
     def deserializeLambda(lambda: String): ClassSummaryBuilder =
-      staticMeth(
+      privateStaticSyntheticMeth(
         "$deserializeLambda$",
         "(Ljava.lang.invoke.SerializedLambda;)Ljava.lang.Object;",
         MethodDependency.Dynamic(

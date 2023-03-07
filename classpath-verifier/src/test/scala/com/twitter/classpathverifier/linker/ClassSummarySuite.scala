@@ -22,7 +22,12 @@ import com.twitter.classpathverifier.testutil.TestBuilds
 
 class ClassSummarySuite extends BaseLinkerSuite with Summary {
 
-  testSummary("test.MyTrait", TestBuilds.abstractMembers, ClassKind.Interface) {
+  testSummary(
+    "test.MyTrait",
+    TestBuilds.abstractMembers,
+    ClassKind.Interface,
+    access = Access.PublicInterface
+  ) {
     _.abstractMeth("foo", "(Ltest.MyTrait;)I")
   }
 
@@ -30,18 +35,19 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
     "test.MyAbstractClass",
     TestBuilds.abstractMembers,
     ClassKind.AbstractClass,
+    access = Access.PublicAbstractClass,
     interfaces = List("test.MyTrait")
   ) {
-    _.emptyCtor
+    _.emptyCtor()
   }
 
   testSummary("test.MyConcreteClass", TestBuilds.abstractMembers, parent = "test.MyAbstractClass") {
-    _.emptyCtor
+    _.emptyCtor()
       .meth("foo", "(Ltest.MyTrait;)I")
   }
 
   testSummary("test.Valid", TestBuilds.valid) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .meth(
         "multiply",
         "(II)I",
@@ -58,7 +64,12 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
       )
   }
 
-  testSummary("test.ValidObject$", TestBuilds.valid, disableOnScala3 = true) { b =>
+  testSummary(
+    "test.ValidObject$",
+    TestBuilds.valid,
+    access = Access.PublicObject,
+    disableOnScala3 = true
+  ) { b =>
     b.obj
       .staticMeth("$anonfun$main$1", "([Ljava.lang.String;)I")
       .deserializeLambda("$anonfun$main$1")
@@ -81,7 +92,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
   }
 
   testSummary("test.InheritedMembers", TestBuilds.inherited) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .main(
         classDep("test.Child"),
         methDep("test.Child#<init>:()V"),
@@ -94,7 +105,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
   }
 
   testSummary("test.Parent", TestBuilds.inherited, interfaces = List("test.ParentInterface")) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .meth("foo", "()I")
   }
 
@@ -104,7 +115,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
     parent = "test.Parent",
     interfaces = List("test.MiddleInterface")
   ) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .meth(
         "bar",
         "()I",
@@ -118,7 +129,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
     parent = "test.Middle",
     interfaces = List("test.ChildInterface")
   ) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .meth(
         "baz",
         "()I",
@@ -128,14 +139,14 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
   }
 
   testSummary("test.ArrayClone", TestBuilds.arrayClone) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .main(
         methDep("java.lang.Object#clone:()Ljava.lang.Object;"),
       )
   }
 
   testSummary("test.Lambda", TestBuilds.lambda, disableOnScala3 = true) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .staticMeth(
         "$anonfun$main$1",
         "(Ljava.lang.String;)Lcats.data.Validated$Valid;",
@@ -153,7 +164,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
   }
 
   testSummary("test.Override", TestBuilds.overrideMembers) { b =>
-    b.emptyCtor
+    b.emptyCtor()
       .main(
         methDep("test.MyBaseTrait#foo:(Ljava.lang.Object;)Ljava.lang.Object;"),
         methDep("test.MyTraitImpl#foo:(Ljava.lang.Object;)Ltest.MyBaseTrait;")
@@ -164,13 +175,14 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
       className: String,
       build: Build,
       kind: ClassKind = ClassKind.Class,
+      access: Access = Access.PublicClass,
       parent: String = "java.lang.Object",
       interfaces: List[String] = Nil,
       disableOnScala3: Boolean = false
   )(builder: ClassSummaryBuilder => Unit)(implicit loc: munit.Location): Unit = {
     test(s"Summarize $className") {
       implicit val ctx: Context = failOnError
-      val expectedSummary = summary(className, kind, parent, interfaces)(builder)
+      val expectedSummary = summary(className, kind, access, parent, interfaces)(builder)
       val classpath = build.allClasspath.full
       Finder(classpath).map(new ClassSummarizer(_)).use { summarizer =>
         val obtainedSummary =
@@ -192,7 +204,7 @@ class ClassSummarySuite extends BaseLinkerSuite with Summary {
 
   private def comparableMethodSummaries(methods: List[MethodSummary]): List[MethodSummary] =
     methods.map(comparableMethodSummary).sortBy { method =>
-      (method.fullClassName, method.methodName, method.descriptor, method.isAbstract)
+      (method.fullClassName, method.methodName, method.descriptor, method.access.rawValue)
     }
 
   private def comparableMethodSummary(summary: MethodSummary): MethodSummary =

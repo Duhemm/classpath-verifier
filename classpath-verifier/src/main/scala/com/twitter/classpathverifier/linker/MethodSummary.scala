@@ -29,8 +29,7 @@ sealed case class MethodSummary(
     methodName: String,
     descriptor: String,
     dependencies: List[Dependency],
-    isAbstract: Boolean,
-    isStatic: Boolean
+    access: Access,
 ) {
   def ref: Reference.Method = Reference.Method(fullClassName, methodName, descriptor)
 }
@@ -42,8 +41,7 @@ object MethodSummary {
         methodName = "",
         descriptor = "",
         dependencies = Nil,
-        isAbstract = false,
-        isStatic = false
+        access = Access.Empty
       )
 
   class Visitor(callback: List[Dependency] => Unit) extends MethodVisitor(Opcodes.ASM9) {

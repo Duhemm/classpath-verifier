@@ -33,6 +33,7 @@ import org.objectweb.asm.Opcodes
 
 sealed case class ClassSummary(
     kind: ClassKind,
+    access: Access,
     name: String,
     parent: Option[String],
     interfaces: List[String],
@@ -61,7 +62,7 @@ sealed case class ClassSummary(
         val methodName = callSiteRef.methodName
         val callSiteDesc = Parser.parse(callSiteRef.descriptor)
         allMethods(summarize).find { method =>
-          !method.isAbstract &&
+          !method.access.isAbstract &&
           method.methodName == methodName &&
           callSiteDesc.compatibleWith(summarize, Parser.parse(method.descriptor))
         }
@@ -70,7 +71,7 @@ sealed case class ClassSummary(
         val methodName = callSiteRef.methodName
         val descriptor = callSiteRef.descriptor
         allMethods(summarize).find { method =>
-          !method.isAbstract &&
+          !method.access.isAbstract &&
           method.methodName == methodName &&
           method.descriptor == descriptor
         }
@@ -92,6 +93,7 @@ object ClassSummary {
   object Missing
       extends ClassSummary(
         kind = ClassKind.Class,
+        access = Access.Empty,
         name = "",
         parent = None,
         interfaces = Nil,
@@ -119,13 +121,22 @@ object ClassSummary {
       val parent = Option(Type.pathToName(reader.getSuperName()))
       val interfaces = reader.getInterfaces().toList.map(Type.pathToName)
       val methods = buffer.toList
+      val access = Access(reader.getAccess())
       val isInterface = (reader.getAccess() & Opcodes.ACC_INTERFACE) != 0
       val isAbstract = (reader.getAccess() & Opcodes.ACC_ABSTRACT) != 0
       val kind =
         if (isInterface) ClassKind.Interface
         else if (isAbstract) ClassKind.AbstractClass
         else ClassKind.Class
-      ClassSummary(kind, Type.pathToName(visitor.fullName), parent, interfaces, methods, Some(path))
+      ClassSummary(
+        kind,
+        access,
+        Type.pathToName(visitor.fullName),
+        parent,
+        interfaces,
+        methods,
+        Some(path)
+      )
     } else {
       val error = ClassfileVersionError(ref, majorVersion)
       ctx.reporter.report(error)
@@ -157,8 +168,6 @@ object ClassSummary {
         signature: String,
         exceptions: Array[String]
     ): MethodVisitor = {
-      val isAbstract = (access & Opcodes.ACC_ABSTRACT) != 0
-      val isStatic = (access & Opcodes.ACC_STATIC) != 0
       val callback = (deps: List[Dependency]) => {
         val summary =
           MethodSummary(
@@ -166,8 +175,7 @@ object ClassSummary {
             name,
             Type.pathToName(descriptor),
             deps,
-            isAbstract,
-            isStatic
+            Access(access)
           )
         buffer += summary
         ()

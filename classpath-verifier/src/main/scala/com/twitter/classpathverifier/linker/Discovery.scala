@@ -71,7 +71,7 @@ object Discovery {
   private def isMain(summary: MethodSummary): Boolean =
     summary.methodName == Constants.MainMethodName &&
       summary.descriptor == Constants.MainMethodDescriptor &&
-      summary.isStatic
+      summary.access.isStatic
 
   private def allMethods(jar: Path)(implicit ctx: Context): List[MethodSummary] =
     for {
